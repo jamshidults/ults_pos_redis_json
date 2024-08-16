@@ -21,9 +21,22 @@ class PosRedis(models.Model):
     _name = 'pos.redis'
     _description = 'Point of Sale Cache'
 
+
+
     def _get_redis_client(self):
-        """Initialize RedisJSON client."""
-        return Client(host='localhost', port=6379, decode_responses=True)
+        """Initialize RedisJSON client using system parameters."""
+        ICPSudo = self.env['ir.config_parameter'].sudo()
+        if ICPSudo.get_param('redis.host'):
+            return Client(
+                host=ICPSudo.get_param('redis.host', 'localhost'),
+                port=int(ICPSudo.get_param('redis.port', 6379)),
+                db=int(ICPSudo.get_param('redis.db', 0)),
+                password=ICPSudo.get_param('redis.password') or None,
+                decode_responses=True
+            )
+        return None
+
+
 
     def get_products_from_database(self, limit=1000, offset=0):
         """Fetch products from database in batches for efficiency."""

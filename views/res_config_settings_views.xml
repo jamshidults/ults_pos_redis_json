@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="ults_pos_redis_res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.redis</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('settings')]" position="inside">
+                <div class="app_settings_block" data-string="Redis" string="Redis" data-key="redis_integration">
+                    <h2>Redis Integration</h2>
+                    <div class="row mt16 o_settings_container" id="redis_setting">
+                        <div class="col-12 col-lg-6 o_setting_box">
+
+                            <div class="o_setting_right_pane">
+
+                                <div class="text-muted">
+                                    Use Redis for caching and data storage
+                                </div>
+                                <div class="content-group" >
+                                    <div class="mt16">
+                                        <label for="redis_host" class="o_light_label"/>
+                                        <field name="redis_host" class="oe_inline"/>
+                                    </div>
+                                    <div>
+                                        <label for="redis_port" class="o_light_label"/>
+                                        <field name="redis_port" class="oe_inline"/>
+                                    </div>
+                                    <div>
+                                        <label for="redis_db" class="o_light_label"/>
+                                        <field name="redis_db" class="oe_inline"/>
+                                    </div>
+                                    <div>
+                                        <label for="redis_password" class="o_light_label"/>
+                                        <field name="redis_password" password="True" class="oe_inline"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>
