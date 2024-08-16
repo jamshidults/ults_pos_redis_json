@@ -17,9 +17,9 @@ FIELD_LIST = [
 ]
 
 
-class PosRedis(models.Model):
-    _name = 'pos.redis'
-    _description = 'Point of Sale Cache'
+class PosRedisMixin(models.AbstractModel):
+    _name = 'pos.redis.mixin'
+    _description = 'Point of Sale Cache Mixin'
 
 
 
@@ -86,7 +86,7 @@ class PosRedis(models.Model):
         try:
             # Retrieve product IDs from Redis with pagination
             product_ids = redis_client.lrange("product_ids", offset, offset + limit - 1)
-            print("product ids>>>>>>>>>>>>>>>>>>>>>>>>>",product_ids)
+
         except redis.exceptions.RedisError as e:
             _logger.error(f"Failed to retrieve product IDs from Redis: {str(e)}")
             return []

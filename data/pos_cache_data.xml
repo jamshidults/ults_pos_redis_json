@@ -3,7 +3,7 @@
     <data>
         <record model="ir.cron" id="update_pos_redis_cache_cron">
             <field name="name">PoS: Update Redis cache</field>
-            <field name="model_id" ref="model_pos_redis"/>
+            <field name="model_id" ref="model_pos_session"/>
             <field name="state">code</field>
             <field name="code">model.with_delay().load_all_products_to_redis()</field>
             <field name="active" eval="False"/>

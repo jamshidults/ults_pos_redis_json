@@ -7,15 +7,16 @@ DOMAIN = [('sale_ok', '=', True), ('available_in_pos', '=', True)]
 
 
 class PosSession(models.Model):
-    _inherit = 'pos.session'
+    _name = 'pos.session'
+    _inherit = ['pos.session', 'pos.redis.mixin']
 
     def get_products_from_cache(self, limit=1000, offset=0):
-        cache = self.env['pos.redis']
-        products = cache.get_limited_products_from_redis(limit=limit, offset=offset)
+
+        products = self.get_limited_products_from_redis(limit=limit, offset=offset)
 
         if not products:
             # If products not found in Redis, fetch from DB and update Redis
-            cache.load_all_products_to_redis()
+            self.load_all_products_to_redis()
             products = self.get_products_from_cache()
 
         return products
@@ -40,7 +41,5 @@ class PosSession(models.Model):
         self._process_pos_ui_product_product(records)
         return records
 
-    def get_total_products_count(self):
-        cache = self.env['pos.redis']
-        return cache.get_total_products_count()
+
 
