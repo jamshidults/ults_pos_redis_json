@@ -35,12 +35,14 @@ const PosCacheChrome = (Chrome) => class PosCacheChrome extends Chrome {
         const nRemaining = totalProductsCount - nInitiallyLoaded;
         if (!(nRemaining > 0)) return;
         const multiple = 1000;
-        let offset = nInitiallyLoaded;
+        console.log("initial loaded",nInitiallyLoaded);
+        let offset = nInitiallyLoaded ;
+
         while (offset < totalProductsCount) {
             const end = Math.min(offset + multiple, totalProductsCount);
-            console.log(`Loading products ${offset + 1} to ${end}`);
+            console.log(`Loading products ${offset} to ${end}`);
             await this.env.pos._loadCachedProducts(offset);
-            offset = end;
+            offset = end ;
             }
 
         this.showNotification(this.env._t('All products are loaded.'), 5000);

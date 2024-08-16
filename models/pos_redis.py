@@ -33,11 +33,13 @@ class PosRedis(models.Model):
 
     @api.model
     def load_all_products_to_redis(self):
-        """Load all products into Redis, serialized as JSON."""
+        """Load all products into Redis, serialized as JSON, and store product IDs separately."""
         redis_client = self._get_redis_client()
         pipeline = redis_client.pipeline()
 
         offset = 0
+        product_ids = []
+
         while True:
             products = self.get_products_from_database(limit=1000, offset=offset)
             if not products:
@@ -46,7 +48,9 @@ class PosRedis(models.Model):
             for product_data in products:
                 try:
                     json_product = json.dumps(product_data, default=date_utils.json_default)
-                    pipeline.jsonset(f"products:{product_data['id']}", Path.rootPath(), json_product)
+                    product_id = product_data['id']
+                    pipeline.jsonset(f"products:{product_id}", Path.rootPath(), json_product)
+                    product_ids.append(product_id)
                 except Exception as e:
                     _logger.error(f"Error serializing product {product_data['id']}: {str(e)}")
 
@@ -58,15 +62,26 @@ class PosRedis(models.Model):
             offset += 1000
             _logger.info(f"Processed batch up to offset {offset} with {len(products)} products.")
 
+        # Store the product IDs as a list in Redis
+        redis_client.rpush("product_ids", *product_ids)
+
     @api.model
     def get_limited_products_from_redis(self, limit=1000, offset=0):
-        """Retrieve limited products from Redis."""
+        """Retrieve limited products from Redis by using pagination on the cached product IDs."""
         redis_client = self._get_redis_client()
 
-        Product = self.env['product.product']
-        product_ids = Product.search(DOMAIN, limit=limit, offset=offset).ids
+        try:
+            # Retrieve product IDs from Redis with pagination
+            product_ids = redis_client.lrange("product_ids", offset, offset + limit - 1)
+            print("product ids>>>>>>>>>>>>>>>>>>>>>>>>>",product_ids)
+        except redis.exceptions.RedisError as e:
+            _logger.error(f"Failed to retrieve product IDs from Redis: {str(e)}")
+            return []
 
-        # Use pipeline for efficient retrieval
+        if not product_ids:
+            return []
+
+        # Use pipeline for efficient retrieval of product data
         pipeline = redis_client.pipeline()
         for product_id in product_ids:
             pipeline.jsonget(f"products:{product_id}", Path.rootPath())
@@ -81,25 +96,12 @@ class PosRedis(models.Model):
 
         return products
 
-    @api.model
-    def get_products_from_redis(self):
-        """Retrieve all products from Redis."""
+    def get_total_products_count(self):
+        """Get the total number of products in Redis."""
         redis_client = self._get_redis_client()
-
-        Product = self.env['product.product']
-        product_ids = Product.search(DOMAIN).ids
-
-        # Use pipeline for efficient retrieval
-        pipeline = redis_client.pipeline()
-        for product_id in product_ids:
-            pipeline.jsonget(f"products:{product_id}", Path.rootPath())
-
         try:
-            json_products = pipeline.execute()
+            total_products = redis_client.llen("product_ids")
         except redis.exceptions.RedisError as e:
-            _logger.error(f"Failed to retrieve products from Redis: {str(e)}")
-            return []
-
-        products = [json.loads(json_product) for json_product in json_products if json_product]
-
-        return products
+            _logger.error(f"Failed to retrieve total products from Redis: {str(e)}")
+            return 0
+        return total_products
