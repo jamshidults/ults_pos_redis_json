@@ -28,7 +28,7 @@ class PosRedisMixin(models.AbstractModel):
         ICPSudo = self.env['ir.config_parameter'].sudo()
         if ICPSudo.get_param('redis.host'):
             return Client(
-                host=ICPSudo.get_param('redis.host', 'localhost'),
+                host=ICPSudo.get_param('redis.host', '127.0.0.1'),
                 port=int(ICPSudo.get_param('redis.port', 6379)),
                 db=int(ICPSudo.get_param('redis.db', 0)),
                 password=ICPSudo.get_param('redis.password') or None,
@@ -44,9 +44,32 @@ class PosRedisMixin(models.AbstractModel):
         products = Product.with_user(self.env.ref('base.user_admin').id).with_context(display_default_code=False)
         return products.search_read(DOMAIN, FIELD_LIST, limit=limit, offset=offset, order='sequence,default_code,name')
 
+    def clear_existing_redis_data(self):
+        """Clear existing product data from Redis."""
+        redis_client = self._get_redis_client()
+        if not redis_client:
+            _logger.error("Redis client could not be initialized.")
+            return
+
+        try:
+            # Delete all keys related to products
+            keys_to_delete = redis_client.keys('products:*')
+            if keys_to_delete:
+                redis_client.delete(*keys_to_delete)
+                _logger.info(f"Deleted {len(keys_to_delete)} existing product keys from Redis.")
+
+            # Clear the product_ids list
+            redis_client.delete("product_ids")
+            _logger.info("Cleared existing product_ids list from Redis.")
+        except redis.exceptions.RedisError as e:
+            _logger.error(f"Failed to clear existing data in Redis: {str(e)}")
+            return
+
     @api.model
     def load_all_products_to_redis(self):
         """Load all products into Redis, serialized as JSON, and store product IDs separately."""
+
+        self.clear_existing_redis_data()
         redis_client = self._get_redis_client()
         pipeline = redis_client.pipeline()
 
@@ -118,3 +141,27 @@ class PosRedisMixin(models.AbstractModel):
             _logger.error(f"Failed to retrieve total products from Redis: {str(e)}")
             return 0
         return total_products
+
+    def _update_redis_cache(self, product):
+        """Update the Redis cache for a specific product."""
+        redis_client = self._get_redis_client()
+        if redis_client:
+            try:
+                product_data = product.read(FIELD_LIST)[0]
+                json_product = json.dumps(product_data, default=date_utils.json_default)
+                redis_client.jsonset(f"products:{product.id}", Path.rootPath(), json_product)
+                _logger.info(f"Product {product.id} updated in Redis cache.")
+            except Exception as e:
+                _logger.error(f"Error updating product {product.id} in Redis cache: {str(e)}")
+    def _remove_from_redis_cache(self, product):
+        """Remove the product from Redis cache."""
+        redis_client = self._get_redis_client()
+        if redis_client:
+            try:
+                redis_client.delete(f"products:{product.id}")
+                redis_client.lrem("product_ids", 0, product.id)
+                _logger.info(f"Product {product.id} removed from Redis cache.")
+            except Exception as e:
+                _logger.error(f"Error removing product {product.id} from Redis cache: {str(e)}")
+
+    # You can also add other helper methods here as needed.

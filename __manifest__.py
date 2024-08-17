@@ -9,9 +9,10 @@
 This creates a product cache per POS config. It drastically lowers the
 time it takes to load a POS session with a lot of products.
     """,
-
+    "author": "Ults Technologies/Jamshid K",
+    "website": "https://ults.in/home",
     'category': 'Sales/Point of Sale',
-    'version': '1.0',
+    'version': '16.0.0.0.1',
     'depends': ['point_of_sale'],
     'data': [
         'data/pos_cache_data.xml',
@@ -24,6 +25,7 @@ time it takes to load a POS session with a lot of products.
             'ults_pos_redis_json/static/**/*',
         ],
     },
-    'license': 'LGPL-3',
+    'license': 'AGPL-3',
+    "external_dependencies": {"python": ["redis", "rejson"]}
 
 }

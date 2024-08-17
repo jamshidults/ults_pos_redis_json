@@ -3,3 +3,4 @@
 from . import res_config
 from . import pos_redis
 from . import pos_session
+from . import product
