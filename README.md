@@ -31,3 +31,8 @@ This guide will walk you through the steps to install and configure Redis on an 
 
      ```bash
      sudo systemctl enable redis-stack-server
+5. **Install PIP packages**
+      ```bash
+      pip install redis
+      pip install rejson
+   
