@@ -1,7 +1,7 @@
 from odoo.tests.common import TransactionCase
-from unittest.mock import patch
-from redis import Redis
-from rejson import Client
+# from unittest.mock import patch
+# from redis import Redis
+# from rejson import Client
 
 class TestPosRedisCommon(TransactionCase):
 
@@ -19,15 +19,20 @@ class TestPosRedisCommon(TransactionCase):
         # cls.patcher.stop()  # Stop patching
         super(TestPosRedisCommon, cls).tearDownClass()
 
+
+
     @classmethod
-    def _get_test_redis_client(cls):
-        """Initialize a Redis client specifically for testing purposes."""
-        return Client(
-            host='127.0.0.1',
-            port=6379,
-            db=15,  # Use a separate database for tests
-            decode_responses=True
-        )
+    def create_product_variant(cls,product_vals):
+        """Helper method to create a product.product record."""
+        if not product_vals:
+            product_vals = {
+                    'name': 'Test Product variant',
+                    'list_price': 100.0,
+                    'standard_price': 70.0,
+                    'type': 'consu',
+                }
+        product = cls.ProductProduct.create(product_vals)
+        return product
 
     @classmethod
     def create_product(cls, product_template_vals=None):

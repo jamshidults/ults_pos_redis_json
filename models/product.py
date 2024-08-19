@@ -25,15 +25,13 @@ class ProductProduct(models.Model):
         redis_client = self._get_redis_client()
         redis_client.rpush("product_ids", product.id)
 
-    def _queue_update_product_redis_cache(self, product):
-        self._update_redis_cache(product)
+
 
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
     def write(self, vals):
         res = super(ProductTemplate, self).write(vals)
-        # Trigger update on related product.product records
         related_products = self.env['product.product'].search([('product_tmpl_id', 'in', self.ids)])
         for product in related_products:
             product.with_delay()._update_redis_cache(product)

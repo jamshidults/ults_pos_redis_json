@@ -36,6 +36,12 @@ class TestProductRedis(TestPosRedisCommon):
         self.run_all_pending_jobs()
         self.assertTrue(self.check_product_in_redis(product.id), "Product not found in Redis after creation.")
 
+    def test_product_variant_create_adds_to_redis(self):
+        """Test that creating a product adds it to Redis."""
+        product = self.create_product_variant(self.product_vals)
+        self.run_all_pending_jobs()
+        self.assertTrue(self.check_product_in_redis(product.id), "Product not found in Redis after creation.")
+
     def test_product_write_updates_redis(self):
         """Test that updating a product updates it in Redis."""
         product = self.create_product(self.product_vals)
@@ -63,7 +69,6 @@ class TestProductRedis(TestPosRedisCommon):
         """Test that deleting a product template removes related products from Redis."""
         product = self.create_product(self.product_vals)
         product_template = product.product_tmpl_id
-        product_template_id = product_template.id
         product_template.unlink()
         self.run_all_pending_jobs()
         self.assertFalse(self.check_product_in_redis(product.id), "Related product still exists in Redis after template deletion.")
