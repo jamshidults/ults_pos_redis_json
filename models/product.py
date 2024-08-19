@@ -36,13 +36,13 @@ class ProductTemplate(models.Model):
         # Trigger update on related product.product records
         related_products = self.env['product.product'].search([('product_tmpl_id', 'in', self.ids)])
         for product in related_products:
-            product._update_redis_cache(product)
+            product.with_delay()._update_redis_cache(product)
         return res
 
     def unlink(self):
         related_products = self.env['product.product'].search([('product_tmpl_id', 'in', self.ids)])
         for product in related_products:
-            product._remove_from_redis_cache(product)
+            product.with_delay()._remove_from_redis_cache(product)
         return super(ProductTemplate, self).unlink()
 
 
