@@ -13,7 +13,7 @@ FIELD_LIST = [
     'taxes_id', 'barcode', 'default_code', 'to_weight', 'uom_id',
     'description_sale', 'description', 'product_tmpl_id', 'tracking',
     'available_in_pos', 'attribute_line_ids', 'active', '__last_update',
-    'image_128', 'id'
+    'image_128', 'id', 'available_lot_for_pos_ids'
 ]
 
 
