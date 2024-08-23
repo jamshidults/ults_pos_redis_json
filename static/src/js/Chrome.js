@@ -34,7 +34,8 @@ const PosCacheChrome = (Chrome) => class PosCacheChrome extends Chrome {
         const totalProductsCount = await this.env.pos._getTotalProductsCount();
         const nRemaining = totalProductsCount - nInitiallyLoaded;
         if (!(nRemaining > 0)) return;
-        const multiple = 1000;
+        const multiple = await this.env.pos._getBatchSize();
+        console.log("multiple",multiple);
         console.log("initial loaded",nInitiallyLoaded);
         let offset = nInitiallyLoaded ;
 

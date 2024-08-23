@@ -1,5 +1,5 @@
 import redis
-from rejson import Client, Path
+from rejson import Client
 from odoo import models, api
 import orjson
 import json
@@ -19,9 +19,15 @@ FIELD_LIST = [
     'image_128', 'id', 'available_lot_for_pos_ids'
 ]
 
+
+
 class PosRedisMixin(models.AbstractModel):
     _name = 'pos.redis.mixin'
     _description = 'Point of Sale Cache Mixin'
+
+    BATCH_SIZE = 5000
+
+
 
     def _get_redis_client(self):
         """Initialize RedisJSON client using system parameters."""
@@ -82,7 +88,7 @@ class PosRedisMixin(models.AbstractModel):
         start_time = time.time()  # Start timing for the entire load operation
 
         while True:
-            products = self.get_products_from_database(limit=1000, offset=offset)
+            products = self.get_products_from_database(limit=self.BATCH_SIZE, offset=offset)
             if not products:
                 break
 

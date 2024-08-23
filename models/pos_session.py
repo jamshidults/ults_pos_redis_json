@@ -10,6 +10,8 @@ class PosSession(models.Model):
     _name = 'pos.session'
     _inherit = ['pos.session', 'pos.redis.mixin']
 
+
+
     def get_products_from_cache(self, limit=1000, offset=0):
 
         products = self.get_limited_products_from_redis(limit=limit, offset=offset)
@@ -37,9 +39,12 @@ class PosSession(models.Model):
         return records
 
     def get_cached_products(self, offset=0):
-        records = self.get_products_from_cache(offset=offset)
+        records = self.get_products_from_cache(limit=self.BATCH_SIZE, offset=offset)
         self._process_pos_ui_product_product(records)
         return records
+
+    def get_batch_size(self):
+        return self.BATCH_SIZE
 
 
 

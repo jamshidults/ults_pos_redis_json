@@ -23,6 +23,14 @@ const PosCachePosGlobalState = (PosGlobalState) => class PosCachePosGlobalState 
         },{ shadow: true });
         this._loadProductProduct(products);
     }
+    async _getBatchSize() {
+        return this.env.services.rpc({
+            model: 'pos.session',
+            method: 'get_batch_size',
+            args: [[]],
+            context: this.env.session.user_context,
+        });
+    }
 }
 Registries.Model.extend(PosGlobalState, PosCachePosGlobalState);
 
