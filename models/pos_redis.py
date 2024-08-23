@@ -1,6 +1,7 @@
 import redis
 from rejson import Client, Path
 from odoo import models, api
+import orjson
 import json
 import logging
 from odoo.tools import date_utils
@@ -87,10 +88,10 @@ class PosRedisMixin(models.AbstractModel):
 
             for product_data in products:
                 try:
-                    json_product = json.dumps(product_data, default=date_utils.json_default)
-                    compressed_product = zlib.compress(json_product.encode('utf-8'))  # Compress JSON data
+                    json_product = orjson.dumps(product_data, default=date_utils.json_default)
+                    compressed_product = zlib.compress(json_product)  # Compress JSON data
                     product_id = product_data['id']
-                    pipeline.set(f"products:{product_id}", compressed_product)  # Use set for compressed data
+                    pipeline.set(f"products:{product_id}", compressed_product)
                     product_ids.append(product_id)
                 except Exception as e:
                     _logger.error(f"Error serializing product {product_data['id']}: {str(e)}")
@@ -173,8 +174,8 @@ class PosRedisMixin(models.AbstractModel):
             start_time = time.time()  # Start timing
             try:
                 product_data = product.read(FIELD_LIST)[0]
-                json_product = json.dumps(product_data, default=date_utils.json_default)
-                compressed_product = zlib.compress(json_product.encode('utf-8'))  # Compress JSON data
+                json_product = orjson.dumps(product_data, default=date_utils.json_default)
+                compressed_product = zlib.compress(json_product)  # Compress JSON data
                 redis_client.set(f"products:{product.id}", compressed_product)
                 _logger.info(f"Product {product.id} updated in Redis cache.")
             except Exception as e:
