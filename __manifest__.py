@@ -13,7 +13,7 @@ time it takes to load a POS session with a lot of products.
     "website": "https://ults.in/home",
     'category': 'Sales/Point of Sale',
     'version': '16.0.0.0.1',
-    'depends': ['point_of_sale'],
+    'depends': ['point_of_sale','queue_job'],
     'data': [
         'data/pos_cache_data.xml',
         'views/res_config_settings_views.xml',

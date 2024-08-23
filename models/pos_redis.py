@@ -4,6 +4,8 @@ from odoo import models, api
 import json
 import logging
 from odoo.tools import date_utils
+import zlib
+import time  # Import the time module
 
 _logger = logging.getLogger(__name__)
 
@@ -16,12 +18,9 @@ FIELD_LIST = [
     'image_128', 'id', 'available_lot_for_pos_ids'
 ]
 
-
 class PosRedisMixin(models.AbstractModel):
     _name = 'pos.redis.mixin'
     _description = 'Point of Sale Cache Mixin'
-
-
 
     def _get_redis_client(self):
         """Initialize RedisJSON client using system parameters."""
@@ -32,17 +31,19 @@ class PosRedisMixin(models.AbstractModel):
                 port=int(ICPSudo.get_param('redis.port', 6379)),
                 db=int(ICPSudo.get_param('redis.db', 0)),
                 password=ICPSudo.get_param('redis.password') or None,
-                decode_responses=True
+                decode_responses=False
             )
         return None
 
-
-
     def get_products_from_database(self, limit=1000, offset=0):
         """Fetch products from database in batches for efficiency."""
+        start_time = time.time()  # Start timing
         Product = self.env['product.product']
         products = Product.with_user(self.env.ref('base.user_admin').id).with_context(display_default_code=False)
-        return products.search_read(DOMAIN, FIELD_LIST, limit=limit, offset=offset, order='sequence,default_code,name')
+        result = products.search_read(DOMAIN, FIELD_LIST, limit=limit, offset=offset, order='sequence,default_code,name')
+        duration = time.time() - start_time  # Calculate duration
+        _logger.info(f"Fetched products from database in {duration:.4f} seconds.")
+        return result
 
     def clear_existing_redis_data(self):
         """Clear existing product data from Redis."""
@@ -51,30 +52,33 @@ class PosRedisMixin(models.AbstractModel):
             _logger.error("Redis client could not be initialized.")
             return
 
+        start_time = time.time()  # Start timing
+
         try:
-            # Delete all keys related to products
             keys_to_delete = redis_client.keys('products:*')
             if keys_to_delete:
                 redis_client.delete(*keys_to_delete)
                 _logger.info(f"Deleted {len(keys_to_delete)} existing product keys from Redis.")
-
-            # Clear the product_ids list
             redis_client.delete("product_ids")
             _logger.info("Cleared existing product_ids list from Redis.")
         except redis.exceptions.RedisError as e:
             _logger.error(f"Failed to clear existing data in Redis: {str(e)}")
             return
 
+        duration = time.time() - start_time  # Calculate duration
+        _logger.info(f"Cleared existing Redis data in {duration:.4f} seconds.")
+
     @api.model
     def load_all_products_to_redis(self):
-        """Load all products into Redis, serialized as JSON, and store product IDs separately."""
-
+        """Load all products into Redis, serialized and compressed as JSON, and store product IDs separately."""
         self.clear_existing_redis_data()
         redis_client = self._get_redis_client()
         pipeline = redis_client.pipeline()
 
         offset = 0
         product_ids = []
+
+        start_time = time.time()  # Start timing for the entire load operation
 
         while True:
             products = self.get_products_from_database(limit=1000, offset=offset)
@@ -84,8 +88,9 @@ class PosRedisMixin(models.AbstractModel):
             for product_data in products:
                 try:
                     json_product = json.dumps(product_data, default=date_utils.json_default)
+                    compressed_product = zlib.compress(json_product.encode('utf-8'))  # Compress JSON data
                     product_id = product_data['id']
-                    pipeline.jsonset(f"products:{product_id}", Path.rootPath(), json_product)
+                    pipeline.set(f"products:{product_id}", compressed_product)  # Use set for compressed data
                     product_ids.append(product_id)
                 except Exception as e:
                     _logger.error(f"Error serializing product {product_data['id']}: {str(e)}")
@@ -101,15 +106,22 @@ class PosRedisMixin(models.AbstractModel):
         # Store the product IDs as a list in Redis
         redis_client.rpush("product_ids", *product_ids)
 
+        total_duration = time.time() - start_time  # Calculate total duration
+        _logger.info(f"Loaded all products to Redis in {total_duration:.4f} seconds.")
+
     @api.model
     def get_limited_products_from_redis(self, limit=1000, offset=0):
-        """Retrieve limited products from Redis by using pagination on the cached product IDs."""
+        """Retrieve limited products from Redis using pagination on the cached product IDs."""
         redis_client = self._get_redis_client()
+        if not redis_client:
+            _logger.error("Redis client could not be initialized.")
+            return []
+
+        start_time = time.time()  # Start timing
 
         try:
-            # Retrieve product IDs from Redis with pagination
             product_ids = redis_client.lrange("product_ids", offset, offset + limit - 1)
-
+            product_ids = [x.decode('utf-8') for x in product_ids]
         except redis.exceptions.RedisError as e:
             _logger.error(f"Failed to retrieve product IDs from Redis: {str(e)}")
             return []
@@ -117,46 +129,65 @@ class PosRedisMixin(models.AbstractModel):
         if not product_ids:
             return []
 
-        # Use pipeline for efficient retrieval of product data
         pipeline = redis_client.pipeline()
         for product_id in product_ids:
-            pipeline.jsonget(f"products:{product_id}", Path.rootPath())
+            pipeline.get(f"products:{product_id}")  # Use get for compressed data
 
         try:
-            json_products = pipeline.execute()
+            compressed_products = pipeline.execute()
         except redis.exceptions.RedisError as e:
             _logger.error(f"Failed to retrieve products from Redis: {str(e)}")
             return []
 
-        products = [json.loads(json_product) for json_product in json_products if json_product]
+        products = [
+            json.loads(zlib.decompress(compressed_product).decode('utf-8'))
+            for compressed_product in compressed_products if compressed_product
+        ]
+
+        duration = time.time() - start_time  # Calculate duration
+        _logger.info(f"Retrieved and decompressed products from Redis in {duration:.4f} seconds.")
 
         return products
 
     def get_total_products_count(self):
         """Get the total number of products in Redis."""
         redis_client = self._get_redis_client()
+
+        start_time = time.time()  # Start timing
+
         try:
             total_products = redis_client.llen("product_ids")
         except redis.exceptions.RedisError as e:
             _logger.error(f"Failed to retrieve total products from Redis: {str(e)}")
             return 0
+
+        duration = time.time() - start_time  # Calculate duration
+        _logger.info(f"Retrieved total product count from Redis in {duration:.4f} seconds.")
+
         return total_products
 
     def _update_redis_cache(self, product):
         """Update the Redis cache for a specific product."""
         redis_client = self._get_redis_client()
         if redis_client:
+            start_time = time.time()  # Start timing
             try:
                 product_data = product.read(FIELD_LIST)[0]
                 json_product = json.dumps(product_data, default=date_utils.json_default)
-                redis_client.jsonset(f"products:{product.id}", Path.rootPath(), json_product)
+                compressed_product = zlib.compress(json_product.encode('utf-8'))  # Compress JSON data
+                redis_client.set(f"products:{product.id}", compressed_product)
                 _logger.info(f"Product {product.id} updated in Redis cache.")
             except Exception as e:
                 _logger.error(f"Error updating product {product.id} in Redis cache: {str(e)}")
+
+            duration = time.time() - start_time  # Calculate duration
+            _logger.info(f"Updated product {product.id} in Redis cache in {duration:.4f} seconds.")
+
     def _remove_from_redis_cache(self, product):
         """Remove the product from Redis cache."""
         redis_client = self._get_redis_client()
         if redis_client:
+            start_time = time.time()  # Start timing
             try:
                 redis_client.delete(f"products:{product.id}")
                 redis_client.lrem("product_ids", 0, product.id)
@@ -164,4 +195,5 @@ class PosRedisMixin(models.AbstractModel):
             except Exception as e:
                 _logger.error(f"Error removing product {product.id} from Redis cache: {str(e)}")
 
-    # You can also add other helper methods here as needed.
+            duration = time.time() - start_time  # Calculate duration
+            _logger.info(f"Removed product {product.id} from Redis cache in {duration:.4f} seconds.")
